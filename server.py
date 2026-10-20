@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 
 load_dotenv(Path(__file__).parent / ".env")
 
-EURI_API_KEY = os.getenv("EURI_API_KEY", "")
+EURI_API_KEY = os.getenv("EURI_API_KEY", "").strip().strip('"\'')  # tolerate stray spaces/quotes in .env
 EURI_LIVE_URL = os.getenv("EURI_LIVE_URL", "wss://api.euron.one/api/v1/euri/live/sessions")
 LIVE_MODEL = os.getenv("EURI_LIVE_MODEL", "gpt-live-1")        # the voice model (listens + speaks)
 BRAIN_MODEL = os.getenv("EURI_BRAIN_MODEL", "gpt-6-luna")       # does reasoning + web search
@@ -85,11 +85,31 @@ async def live(browser: WebSocket):
     except WebSocketDisconnect:
         pass
     except Exception as error:
-        print("Live session error:", error)
+        message = describe_error(error)
+        print("Live session error:", message)
         try:
-            await browser.send_text(json.dumps({"type": "error", "error": {"message": str(error)}}))
+            await browser.send_text(json.dumps({"type": "error", "error": {"message": message}}))
         except Exception:
             pass
+
+
+def describe_error(error):
+    """Turn a failed EURI handshake into a readable message (the reason is in the response body)."""
+    if not isinstance(error, websockets.InvalidStatus):
+        return str(error)
+    status = error.response.status_code
+    body = bytes(error.response.body or b"").decode(errors="replace")
+    try:
+        reason = json.loads(body)["error"]["message"]
+    except (ValueError, KeyError, TypeError):
+        reason = body[:300].strip() or "no details returned"
+    hints = {
+        401: "Check EURI_API_KEY in .env (missing, wrong or revoked), then restart the server.",
+        403: "The key was accepted but is not allowed to use this. Check that your EURI plan includes "
+             f"'{LIVE_MODEL}' / '{BRAIN_MODEL}' and has credits, or create a new key at https://euron.one/euri.",
+    }
+    hint = hints.get(status, "")
+    return f"EURI rejected the connection (HTTP {status}): {reason}" + (f" -> {hint}" if hint else "")
 
 
 if __name__ == "__main__":
@@ -97,5 +117,5 @@ if __name__ == "__main__":
 
     if not EURI_API_KEY:
         raise SystemExit("Add EURI_API_KEY to the .env file first (see README).")
-    print("Open http://localhost:8000 in Chrome or Edge")
+    print("Open http://localhost:8001 in Chrome or Edge")
     uvicorn.run(app, host="127.0.0.1", port=8001)

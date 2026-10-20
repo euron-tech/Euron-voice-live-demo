@@ -90,8 +90,6 @@ python server.py
 
 Then open **http://127.0.0.1:8001** in Chrome or Edge and allow microphone access when the browser asks.
 
-> The startup message says `localhost:8000`, but the server listens on port **8001**.
-
 Stop the server with `Ctrl + C`.
 
 ### Alternative: run with uvicorn (auto-reload while developing)
@@ -122,6 +120,8 @@ This skips the startup check for `EURI_API_KEY`, so make sure your `.env` is fil
 ## Troubleshooting
 
 - **`Add EURI_API_KEY to the .env file first`**: `.env` is missing, or the key is empty. Repeat step 4.
+- **`EURI rejected the connection (HTTP 401)`**: the API key is missing, wrong or revoked. The message gives the exact reason. Put a valid key in `.env` and restart the server.
+- **`EURI rejected the connection (HTTP 403)`**: the key was accepted, but your account isn't allowed to do this. Usually the plan doesn't include `gpt-live-1` / `gpt-6-luna`, or it's out of credits. Read the reason in the message, then check your plan at [euron.one/euri](https://euron.one/euri) or create a new key.
 - **No microphone prompt or no audio**: use Chrome or Edge, and open the page at `127.0.0.1` or `localhost`. Browsers only allow the mic on secure origins, and those two count as secure.
 - **`Address already in use`**: something else is using port 8001. Stop it, or run with uvicorn on another port, e.g. `--port 8002`.
 - **Errors in the transcript**: check that your API key is valid and that the model names in `.env` are correct.
